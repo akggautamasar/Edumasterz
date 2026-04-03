@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +7,7 @@
 
     <link href="//vjs.zencdn.net/8.3.0/video-js.min.css" rel="stylesheet">
     <script src="//vjs.zencdn.net/8.3.0/video.min.js"></script>
+
     <style>
         :root {
             --primary-500: #0ea5e9;
@@ -93,60 +93,22 @@
             border-radius: var(--radius-2xl);
         }
 
-        /* Speed Controls Container */
-        .speed-controls-container {
+        /* Controls */
+        .speed-controls-container, .quality-controls-container {
             position: absolute;
             top: var(--space-4);
-            right: var(--space-4);
             z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-2);
             background: rgba(0, 0, 0, 0.9);
             border-radius: var(--radius-xl);
             padding: var(--space-4);
             backdrop-filter: blur(10px);
-            transition: opacity var(--transition-normal);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Quality Controls Container */
-        .quality-controls-container {
-            position: absolute;
-            top: var(--space-4);
-            left: var(--space-4);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-2);
-            background: rgba(0, 0, 0, 0.9);
-            border-radius: var(--radius-xl);
-            padding: var(--space-4);
-            backdrop-filter: blur(10px);
-            transition: opacity var(--transition-normal);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
+        .speed-controls-container { right: var(--space-4); }
+        .quality-controls-container { left: var(--space-4); }
 
-        .speed-controls-container:hover {
-            opacity: 1;
-        }
-
-        .quality-controls-container:hover {
-            opacity: 1;
-        }
-
-        .speed-controls-title {
-            color: white;
-            font-size: 0.8rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: var(--space-2);
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .quality-controls-title {
+        .speed-controls-title, .quality-controls-title {
             color: white;
             font-size: 0.8rem;
             font-weight: 700;
@@ -171,7 +133,7 @@
             max-width: 160px;
         }
 
-        .speed-btn {
+        .speed-btn, .quality-btn {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             color: white;
@@ -182,30 +144,9 @@
             cursor: pointer;
             transition: all var(--transition-fast);
             text-align: center;
-            min-width: 40px;
         }
 
-        .quality-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: var(--space-2);
-            border-radius: var(--radius-lg);
-            font-size: 0.75rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all var(--transition-fast);
-            text-align: center;
-            min-width: 50px;
-        }
-
-        .speed-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            border-color: rgba(255, 255, 255, 0.4);
-            transform: scale(1.05);
-        }
-
-        .quality-btn:hover {
+        .speed-btn:hover, .quality-btn:hover {
             background: rgba(255, 255, 255, 0.2);
             border-color: rgba(255, 255, 255, 0.4);
             transform: scale(1.05);
@@ -214,24 +155,18 @@
         .speed-btn.active {
             background: var(--primary-500);
             border-color: var(--primary-500);
-            color: white;
-            font-weight: 700;
             box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
         }
 
         .quality-btn.active {
             background: var(--success-500);
             border-color: var(--success-500);
-            color: white;
-            font-weight: 700;
             box-shadow: 0 0 20px rgba(34, 197, 94, 0.5);
         }
 
-        /* Speed Indicator */
-        .speed-indicator {
+        .speed-indicator, .quality-indicator {
             position: absolute;
             bottom: var(--space-4);
-            left: var(--space-4);
             background: rgba(0, 0, 0, 0.9);
             color: white;
             padding: var(--space-2) var(--space-4);
@@ -240,26 +175,11 @@
             font-weight: 700;
             z-index: 1000;
             backdrop-filter: blur(10px);
-            transition: opacity var(--transition-normal);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Quality Indicator */
-        .quality-indicator {
-            position: absolute;
-            bottom: var(--space-4);
-            right: var(--space-4);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: var(--space-2) var(--space-4);
-            border-radius: var(--radius-lg);
-            font-size: 0.9rem;
-            font-weight: 700;
-            z-index: 1000;
-            backdrop-filter: blur(10px);
-            transition: opacity var(--transition-normal);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
+        .speed-indicator { left: var(--space-4); }
+        .quality-indicator { right: var(--space-4); }
 
         .controls-container {
             display: flex;
@@ -291,240 +211,37 @@
             box-shadow: var(--shadow-xl);
         }
 
-        .control-btn:active {
-            transform: translateY(0);
-        }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-500), var(--primary-600)); color: white; }
+        .btn-success { background: linear-gradient(135deg, var(--success-500), var(--success-600)); color: white; }
+        .btn-warning { background: linear-gradient(135deg, var(--warning-500), var(--warning-600)); color: white; }
 
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-500), var(--primary-600));
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(135deg, var(--primary-600), var(--primary-700));
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, var(--success-500), var(--success-600));
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: linear-gradient(135deg, var(--success-600), #15803d);
-        }
-
-        .btn-warning {
-            background: linear-gradient(135deg, var(--warning-500), var(--warning-600));
-            color: white;
-        }
-
-        .btn-warning:hover {
-            background: linear-gradient(135deg, var(--warning-600), #b45309);
-        }
-
-        /* Mobile Styles */
+        /* Mobile */
         @media (max-width: 768px) {
-            body {
-                padding: var(--space-4);
-            }
-
-            .header h1 {
-                font-size: 2rem;
-            }
-
-            .header p {
-                font-size: 1rem;
-            }
-
-            .video-container {
-                border-radius: var(--radius-xl);
-            }
-
-            .speed-controls-container {
-                top: var(--space-2);
-                right: var(--space-2);
-                padding: var(--space-2);
-            }
-
-            .quality-controls-container {
-                top: var(--space-2);
-                left: var(--space-2);
-                padding: var(--space-2);
-            }
-
-            .speed-controls {
-                grid-template-columns: repeat(3, 1fr);
-                gap: 2px;
-                max-width: 150px;
-            }
-
-            .quality-controls {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 2px;
-                max-width: 120px;
-            }
-
-            .speed-btn {
-                padding: var(--space-1);
-                font-size: 0.7rem;
-                min-width: 35px;
-            }
-
-            .quality-btn {
-                padding: var(--space-1);
-                font-size: 0.7rem;
-                min-width: 40px;
-            }
-
-            .speed-indicator {
-                bottom: var(--space-2);
-                left: var(--space-2);
-                padding: var(--space-1) var(--space-2);
-                font-size: 0.8rem;
-            }
-
-            .quality-indicator {
-                bottom: var(--space-2);
-                right: var(--space-2);
-                padding: var(--space-1) var(--space-2);
-                font-size: 0.8rem;
-            }
-
-            .controls-container {
-                gap: var(--space-2);
-            }
-
-            .control-btn {
-                padding: var(--space-3) var(--space-4);
-                font-size: 0.9rem;
-                min-width: 150px;
-                flex: 1;
-                max-width: 200px;
-            }
+            body { padding: var(--space-4); }
+            .header h1 { font-size: 2rem; }
+            .speed-controls { grid-template-columns: repeat(3, 1fr); max-width: 150px; }
+            .control-btn { min-width: 150px; flex: 1; max-width: 200px; }
         }
 
         @media (max-width: 480px) {
-            body {
-                padding: var(--space-2);
-            }
-
-            .header h1 {
-                font-size: 1.5rem;
-            }
-
-            .header p {
-                font-size: 0.9rem;
-            }
-
-            .speed-controls-container {
-                padding: var(--space-1);
-            }
-
-            .quality-controls-container {
-                padding: var(--space-1);
-            }
-
-            .speed-controls {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 1px;
-                max-width: 100px;
-            }
-
-            .quality-controls {
-                grid-template-columns: repeat(1, 1fr);
-                gap: 1px;
-                max-width: 80px;
-            }
-
-            .speed-btn {
-                padding: 4px;
-                font-size: 0.65rem;
-                min-width: 30px;
-            }
-
-            .quality-btn {
-                padding: 4px;
-                font-size: 0.65rem;
-                min-width: 35px;
-            }
-
-            .speed-indicator {
-                padding: 4px var(--space-1);
-                font-size: 0.7rem;
-            }
-
-            .quality-indicator {
-                padding: 4px var(--space-1);
-                font-size: 0.7rem;
-            }
-
-            .controls-container {
-                flex-direction: column;
-                align-items: center;
-            }
-
-            .control-btn {
-                width: 100%;
-                max-width: 280px;
-                margin-bottom: var(--space-2);
-            }
+            .speed-controls { grid-template-columns: repeat(2, 1fr); max-width: 100px; }
+            .quality-controls { grid-template-columns: repeat(1, 1fr); max-width: 80px; }
+            .controls-container { flex-direction: column; align-items: center; }
+            .control-btn { width: 100%; max-width: 280px; margin-bottom: var(--space-2); }
         }
 
-        /* Landscape mobile */
-        @media (max-width: 768px) and (orientation: landscape) {
-            body {
-                padding: var(--space-2);
-            }
-
-            .header {
-                margin-bottom: var(--space-4);
-            }
-
-            .header h1 {
-                font-size: 1.5rem;
-            }
-
-            .video-container {
-                max-height: 70vh;
-            }
-
-            .controls-container {
-                margin-top: var(--space-2);
-            }
-
-            .speed-controls-container {
-                opacity: 0.7;
-            }
-
-            .quality-controls-container {
-                opacity: 0.7;
-            }
-
-            .speed-controls-container:hover {
-                opacity: 1;
-            }
-        }
-            .quality-controls-container:hover {
-                opacity: 1;
-            }
-
-        /* Loading state */
+        /* Loading */
         .video-container.loading {
-            background: linear-gradient(90deg, var(--secondary-100) 25%, var(--secondary-200) 50%, var(--secondary-100) 75%);
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
             background-size: 200% 100%;
             animation: loading 1.5s infinite;
         }
 
         @keyframes loading {
-            0% {
-                background-position: 200% 0;
-            }
-            100% {
-                background-position: -200% 0;
-            }
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
 
-        /* Error state */
         .error-message {
             color: #dc2626;
             text-align: center;
@@ -537,7 +254,6 @@
             font-weight: 600;
         }
 
-        /* Success message for copy actions */
         .success-message {
             position: fixed;
             top: var(--space-6);
@@ -553,72 +269,9 @@
             font-weight: 600;
         }
 
-        .success-message.show {
-            transform: translateX(0);
-        }
-
-        @media (max-width: 480px) {
-            .success-message {
-                top: var(--space-4);
-                right: var(--space-4);
-                left: var(--space-4);
-                text-align: center;
-            }
-        }
-
-        /* Hide controls on mobile when not needed */
-        @media (max-width: 480px) {
-            .speed-controls-container {
-                opacity: 0.5;
-            }
-            
-            .speed-controls-container:hover,
-            .speed-controls-container:focus-within {
-                opacity: 1;
-            }
-        }
-
-        /* Keyboard shortcuts info */
-        .shortcuts-info {
-            position: fixed;
-            bottom: var(--space-6);
-            left: var(--space-6);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: var(--space-4);
-            border-radius: var(--radius-xl);
-            font-size: 0.8rem;
-            opacity: 0;
-            transition: opacity var(--transition-normal);
-            pointer-events: none;
-            z-index: 1000;
-            max-width: 280px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .shortcuts-info.show {
-            opacity: 1;
-        }
-
-        @media (max-width: 768px) {
-            .shortcuts-info {
-                display: none;
-            }
-        }
-
-        .shortcuts-info h4 {
-            font-weight: 700;
-            margin-bottom: var(--space-2);
-            color: var(--primary-400);
-        }
-
-        .shortcuts-info div {
-            margin-bottom: var(--space-1);
-            opacity: 0.9;
-        }
+        .success-message.show { transform: translateX(0); }
     </style>
 </head>
-
 <body>
     <div class="header">
         <h1>🎓 EduMaster Pro</h1>
@@ -656,454 +309,224 @@
             </div>
         </div>
 
-        <!-- Speed Indicator -->
+        <!-- Indicators -->
         <div class="speed-indicator" id="speed-indicator">1.0x</div>
-
-        <!-- Quality Indicator -->
         <div class="quality-indicator" id="quality-indicator">Original</div>
 
-        <video id="my-player" class="video-js vjs-fluid" controls preload="auto" data-setup='{}'>
+        <video id="my-player" class="video-js vjs-fluid" controls preload="metadata" data-setup='{}'>
             <source id="video-src" src="" type="video/mp4">
-            </source>
             <p class="vjs-no-js">
-                To view this video please enable JavaScript, and consider upgrading to a
-                web browser that
-                <a href="https://videojs.com/html5-video-support/" target="_blank">
-                    supports HTML5 video
-                </a>
+                To view this video please enable JavaScript and use a modern browser.
             </p>
         </video>
     </div>
 
     <div class="controls-container">
         <button class="control-btn btn-primary" onclick="copyStreamUrl()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-            </svg>
-            Copy Stream URL
+            📋 Copy Stream URL
         </button>
         <button class="control-btn btn-warning" onclick="copyDownloadUrl()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7,10 12,15 17,10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Copy Download URL
+            📋 Copy Download URL
         </button>
         <button class="control-btn btn-success" onclick="openDownloadUrl()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15,3 21,3 21,9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-            Open Download URL
+            ⬇️ Open Download URL
         </button>
-    </div>
-
-    <!-- Keyboard Shortcuts Info -->
-    <div class="shortcuts-info" id="shortcuts-info">
-        <h4>🎬 Speed Controls</h4>
-        <div>1-9: Quick speed selection</div>
-        <div>0: Reset to normal speed</div>
-        <div>Ctrl/Cmd + ↑/↓: Adjust speed</div>
-        <div>+/-: Fine speed adjustment</div>
-        <div>Q: Cycle video quality</div>
     </div>
 
     <script>
-        const downloadUrl = (new URL(window.location.href)).searchParams.get('url');
+        const downloadUrl = new URL(window.location.href).searchParams.get('url');
         const videoContainer = document.getElementById('video-container');
-        const videoSrc = document.getElementById('video-src');
         const speedIndicator = document.getElementById('speed-indicator');
         const qualityIndicator = document.getElementById('quality-indicator');
-        
+
         let currentSpeed = 1.0;
         let currentQuality = 'original';
         let player = null;
-
-        // Speed presets mapping
-        const speedPresets = {
-            '1': 0.25, '2': 0.5, '3': 0.75, '4': 1.0,
-            '5': 1.25, '6': 1.5, '7': 1.75, '8': 2.0, '9': 2.5
-        };
-
-        // Get available qualities from the video file
         let availableQualities = ['original'];
 
-        if (downloadUrl) {
-            videoSrc.src = downloadUrl;
-            
-            // Add loading state
+        const speedPresets = { '1':0.25, '2':0.5, '3':0.75, '4':1.0, '5':1.25, '6':1.5, '7':1.75, '8':2.0, '9':2.5 };
+
+        if (!downloadUrl) {
+            showError('No video URL provided in ?url= parameter.');
+        } else {
             videoContainer.classList.add('loading');
-            
-            // Check for available encoded versions
-            checkAvailableQualities();
-            
-            // Initialize Video.js player
+
             player = videojs('my-player', {
                 responsive: true,
                 fluid: true,
-                playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4]
+                preload: "metadata",
+                playbackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4],
+                controls: true,
+                crossOrigin: "anonymous"
             });
 
-            // Remove loading state when video loads
-            player.ready(function() {
+            player.src({ type: "video/mp4", src: downloadUrl });
+
+            player.ready(() => {
                 videoContainer.classList.remove('loading');
-                
-                // Load saved speed preference
+
+                // Load saved preferences
                 const savedSpeed = localStorage.getItem('videoSpeed');
-                if (savedSpeed) {
-                    currentSpeed = parseFloat(savedSpeed);
-                    setPlaybackSpeed(currentSpeed);
-                }
-                
-                // Load saved quality preference
+                if (savedSpeed) setPlaybackSpeed(parseFloat(savedSpeed));
+
                 const savedQuality = localStorage.getItem('videoQuality');
-                if (savedQuality && availableQualities.includes(savedQuality)) {
-                    setVideoQuality(savedQuality);
-                }
-                
-                // Show keyboard shortcuts briefly
+                if (savedQuality) setVideoQuality(savedQuality);
+
                 showKeyboardShortcuts();
             });
-            
-            // Handle video errors
-            player.on('error', function() {
-                videoContainer.classList.remove('loading');
-                showError('Failed to load video. Please check the URL and try again.');
-            });
 
-        } else {
-            showError('No video URL provided.');
+            player.on('error', () => {
+                videoContainer.classList.remove('loading');
+                showError('Failed to load video. Please check the URL.');
+            });
         }
 
-        // Check available qualities
-        async function checkAvailableQualities() {
-            try {
-                // Extract path from the download URL
+        // Improved Quality Switching
+        async function setVideoQuality(quality) {
+            if (!player || !availableQualities.includes(quality)) return;
+
+            const currentTime = player.currentTime() || 0;
+            const wasPlaying = !player.paused();
+
+            currentQuality = quality;
+
+            let newSrc = downloadUrl;
+            if (quality !== 'original') {
                 const urlObj = new URL(downloadUrl);
                 const pathParam = urlObj.searchParams.get('path');
-                
                 if (pathParam) {
-                    // Check each quality by making a HEAD request
-                    const qualities = ['480p', '360p', '240p'];
-                    
-                    for (const quality of qualities) {
-                        try {
-                            const qualityUrl = `/file?path=${encodeURIComponent(pathParam)}&quality=${quality}`;
-                            const response = await fetch(qualityUrl, { method: 'HEAD' });
-                            
-                            if (response.ok) {
-                                availableQualities.push(quality);
-                            }
-                        } catch (e) {
-                            // Quality not available
-                        }
-                    }
-                    
-                    // Update quality controls visibility
-                    updateQualityControls();
+                    newSrc = `/file?path=${encodeURIComponent(pathParam)}&quality=${quality}`;
                 }
-            } catch (e) {
-                console.log('Could not check available qualities:', e);
             }
-        }
 
-        // Update quality controls based on available qualities
-        function updateQualityControls() {
-            const qualityButtons = document.querySelectorAll('.quality-btn');
-            
-            qualityButtons.forEach(btn => {
-                const quality = btn.dataset.quality;
-                if (!availableQualities.includes(quality)) {
-                    btn.style.display = 'none';
-                }
+            player.src({ type: "video/mp4", src: newSrc });
+
+            player.one('loadedmetadata', () => {
+                player.currentTime(Math.min(currentTime, player.duration() - 1 || 0));
+                if (wasPlaying) player.play().catch(() => {});
+                updateQualityDisplay(quality);
+                localStorage.setItem('videoQuality', quality);
             });
+
+            // Fallback resume
+            setTimeout(() => {
+                if (player.currentTime() < 1 && currentTime > 1) {
+                    player.currentTime(currentTime);
+                }
+            }, 800);
         }
 
-        // Speed control functions
         function setPlaybackSpeed(speed) {
             if (player) {
                 currentSpeed = speed;
                 player.playbackRate(speed);
                 updateSpeedDisplay(speed);
-                
-                // Save speed preference
                 localStorage.setItem('videoSpeed', speed.toString());
             }
         }
 
-        // Quality control functions
-        function setVideoQuality(quality) {
-            if (player && availableQualities.includes(quality)) {
-                currentQuality = quality;
-                
-                // Get current time to resume from same position
-                const currentTime = player.currentTime();
-                const isPaused = player.paused();
-                
-                // Update video source
-                const urlObj = new URL(downloadUrl);
-                const pathParam = urlObj.searchParams.get('path');
-                
-                if (pathParam) {
-                    let newUrl;
-                    if (quality === 'original') {
-                        newUrl = downloadUrl;
-                    } else {
-                        newUrl = `/file?path=${encodeURIComponent(pathParam)}&quality=${quality}`;
-                    }
-                    
-                    player.src(newUrl);
-                    
-                    // Resume from same position
-                    player.ready(() => {
-                        player.currentTime(currentTime);
-                        if (!isPaused) {
-                            player.play();
-                        }
-                    });
-                }
-                
-                updateQualityDisplay(quality);
-                
-                // Save quality preference
-                localStorage.setItem('videoQuality', quality);
-            }
-        }
         function updateSpeedDisplay(speed) {
             speedIndicator.textContent = speed + 'x';
-            
-            // Update active button
             document.querySelectorAll('.speed-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (parseFloat(btn.dataset.speed) === speed) {
-                    btn.classList.add('active');
-                }
+                btn.classList.toggle('active', parseFloat(btn.dataset.speed) === speed);
             });
         }
 
         function updateQualityDisplay(quality) {
             qualityIndicator.textContent = quality === 'original' ? 'Original' : quality.toUpperCase();
-            
-            // Update active button
             document.querySelectorAll('.quality-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.dataset.quality === quality) {
-                    btn.classList.add('active');
-                }
+                btn.classList.toggle('active', btn.dataset.quality === quality);
             });
         }
+
         function adjustSpeed(increment) {
             const newSpeed = Math.max(0.25, Math.min(4.0, currentSpeed + increment));
             setPlaybackSpeed(newSpeed);
         }
 
-        // Event listeners for speed buttons
+        // Button listeners
         document.querySelectorAll('.speed-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const speed = parseFloat(this.dataset.speed);
-                setPlaybackSpeed(speed);
-            });
+            btn.addEventListener('click', () => setPlaybackSpeed(parseFloat(btn.dataset.speed)));
         });
 
-        // Event listeners for quality buttons
         document.querySelectorAll('.quality-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const quality = this.dataset.quality;
-                setVideoQuality(quality);
-            });
+            btn.addEventListener('click', () => setVideoQuality(btn.dataset.quality));
         });
 
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            // Don't interfere if user is typing in an input
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        // Keyboard Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
 
-            // Speed presets (1-9 keys)
             if (speedPresets[e.key]) {
                 e.preventDefault();
                 setPlaybackSpeed(speedPresets[e.key]);
-                return;
-            }
-
-            // Reset to normal speed (0 key)
-            if (e.key === '0') {
+            } else if (e.key === '0') {
                 e.preventDefault();
                 setPlaybackSpeed(1.0);
-                return;
-            }
-
-            // Quality shortcuts (Q key cycles through qualities)
-            if (e.key.toLowerCase() === 'q') {
+            } else if (e.key.toLowerCase() === 'q') {
                 e.preventDefault();
-                const currentIndex = availableQualities.indexOf(currentQuality);
-                const nextIndex = (currentIndex + 1) % availableQualities.length;
-                setVideoQuality(availableQualities[nextIndex]);
-                return;
-            }
-
-            // Fine speed adjustment
-            if (e.key === '+' || e.key === '=') {
+                const idx = availableQualities.indexOf(currentQuality);
+                setVideoQuality(availableQualities[(idx + 1) % availableQualities.length]);
+            } else if (e.key === '+' || e.key === '=') {
                 e.preventDefault();
                 adjustSpeed(0.25);
-                return;
-            }
-
-            if (e.key === '-') {
+            } else if (e.key === '-') {
                 e.preventDefault();
                 adjustSpeed(-0.25);
-                return;
-            }
-
-            // Ctrl/Cmd + Arrow keys for speed adjustment
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    adjustSpeed(0.25);
-                    return;
-                }
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    adjustSpeed(-0.25);
-                    return;
-                }
-
-                // Copy shortcuts
-                if (e.key === 'c') {
-                    e.preventDefault();
-                    copyStreamUrl();
-                    return;
-                }
-                if (e.key === 'd') {
-                    e.preventDefault();
-                    copyDownloadUrl();
-                    return;
-                }
-                if (e.key === 'o') {
-                    e.preventDefault();
-                    openDownloadUrl();
-                    return;
-                }
+            } else if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'ArrowUp') adjustSpeed(0.25);
+                if (e.key === 'ArrowDown') adjustSpeed(-0.25);
+                if (e.key === 'c') copyStreamUrl();
+                if (e.key === 'd') copyDownloadUrl();
+                if (e.key === 'o') openDownloadUrl();
             }
         });
 
         function showError(message) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = message;
-            videoContainer.parentNode.insertBefore(errorDiv, videoContainer.nextSibling);
+            const div = document.createElement('div');
+            div.className = 'error-message';
+            div.textContent = message;
+            videoContainer.parentNode.insertBefore(div, videoContainer.nextSibling);
         }
 
-        function showSuccessMessage(message) {
-            // Remove existing success message
-            const existingMessage = document.querySelector('.success-message');
-            if (existingMessage) {
-                existingMessage.remove();
-            }
+        function showSuccessMessage(msg) {
+            const existing = document.querySelector('.success-message');
+            if (existing) existing.remove();
 
-            const successDiv = document.createElement('div');
-            successDiv.className = 'success-message';
-            successDiv.textContent = message;
-            document.body.appendChild(successDiv);
+            const div = document.createElement('div');
+            div.className = 'success-message';
+            div.textContent = msg;
+            document.body.appendChild(div);
 
-            // Show the message
+            setTimeout(() => div.classList.add('show'), 50);
             setTimeout(() => {
-                successDiv.classList.add('show');
-            }, 100);
-
-            // Hide the message after 3 seconds
-            setTimeout(() => {
-                successDiv.classList.remove('show');
-                setTimeout(() => {
-                    successDiv.remove();
-                }, 300);
-            }, 3000);
-        }
-
-        function showKeyboardShortcuts() {
-            const shortcuts = document.getElementById('shortcuts-info');
-            shortcuts.classList.add('show');
-            setTimeout(() => {
-                shortcuts.classList.remove('show');
-            }, 5000);
+                div.classList.remove('show');
+                setTimeout(() => div.remove(), 300);
+            }, 2800);
         }
 
         function copyTextToClipboard(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(function () {
-                    showSuccessMessage('Link copied to clipboard!');
-                }).catch(function (err) {
-                    console.error('Could not copy text: ', err);
-                    fallbackCopyTextToClipboard(text);
-                });
-            } else {
-                fallbackCopyTextToClipboard(text);
-            }
+            navigator.clipboard.writeText(text).then(() => {
+                showSuccessMessage('Link copied to clipboard!');
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                showSuccessMessage('Link copied to clipboard!');
+            });
         }
 
-        function fallbackCopyTextToClipboard(text) {
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            textArea.style.top = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
+        function copyStreamUrl() { copyTextToClipboard(window.location.href); }
+        function copyDownloadUrl() { if (downloadUrl) copyTextToClipboard(downloadUrl); }
+        function openDownloadUrl() { if (downloadUrl) window.open(downloadUrl, '_blank'); }
 
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    showSuccessMessage('Link copied to clipboard!');
-                } else {
-                    alert('Failed to copy the link.');
-                }
-            } catch (err) {
-                console.error('Fallback: Oops, unable to copy', err);
-                alert('Failed to copy the link.');
-            }
-
-            document.body.removeChild(textArea);
-        }
-
-        function copyStreamUrl() {
-            copyTextToClipboard(window.location.href);
-        }
-
-        function copyDownloadUrl() {
-            if (downloadUrl) {
-                copyTextToClipboard(downloadUrl);
-            } else {
-                alert('No download URL available.');
-            }
-        }
-
-        function openDownloadUrl() {
-            if (downloadUrl) {
-                window.location.href = downloadUrl;
-            } else {
-                alert('No download URL available.');
-            }
-        }
-
-        // Handle orientation changes on mobile
-        window.addEventListener('orientationchange', function() {
-            setTimeout(function() {
-                if (player) {
-                    player.trigger('resize');
-                }
-            }, 500);
-        });
-
-        // Handle window resize
-        window.addEventListener('resize', function() {
-            if (player) {
-                player.trigger('resize');
-            }
-        });
+        // Resize handling
+        window.addEventListener('resize', () => player && player.trigger('resize'));
     </script>
 </body>
-
 </html>
