@@ -1,0 +1,129 @@
+{
+  "total_tests": 13,
+  "passed_tests": 10,
+  "failed_tests": 3,
+  "success_rate": 76.92307692307693,
+  "test_results": [
+    {
+      "test_name": "Health Check API",
+      "success": true,
+      "details": "Status: ok, Version: 2.0.0",
+      "response_data": {
+        "status": "ok",
+        "version": "2.0.0",
+        "features": [
+          "streaming",
+          "range-requests",
+          "tokens",
+          "tags",
+          "search"
+        ]
+      },
+      "timestamp": "2026-04-03T20:48:10.023972"
+    },
+    {
+      "test_name": "Password Check API (Valid)",
+      "success": true,
+      "details": "Correct password accepted",
+      "response_data": {
+        "status": "ok"
+      },
+      "timestamp": "2026-04-03T20:48:10.128396"
+    },
+    {
+      "test_name": "Password Check API (Invalid)",
+      "success": true,
+      "details": "Wrong password rejected",
+      "response_data": {
+        "status": "Invalid password"
+      },
+      "timestamp": "2026-04-03T20:48:10.305914"
+    },
+    {
+      "test_name": "CORS OPTIONS /file",
+      "success": false,
+      "details": "HTTP 204",
+      "response_data": "",
+      "timestamp": "2026-04-03T20:48:10.376488"
+    },
+    {
+      "test_name": "Create Share Token API",
+      "success": true,
+      "details": "Expected 'File not found' in demo mode",
+      "response_data": {
+        "status": "File not found"
+      },
+      "timestamp": "2026-04-03T20:48:10.775073"
+    },
+    {
+      "test_name": "Add Tags API",
+      "success": false,
+      "details": "Unexpected status: 'NoneType' object has no attribute 'get_file'",
+      "response_data": {
+        "status": "'NoneType' object has no attribute 'get_file'"
+      },
+      "timestamp": "2026-04-03T20:48:10.933229"
+    },
+    {
+      "test_name": "Get Tags API",
+      "success": true,
+      "details": "Response: File not found",
+      "response_data": {
+        "status": "File not found"
+      },
+      "timestamp": "2026-04-03T20:48:11.057686"
+    },
+    {
+      "test_name": "Search By Tags API",
+      "success": true,
+      "details": "Found 0 files",
+      "response_data": {
+        "status": "ok",
+        "file_ids": [],
+        "count": 0
+      },
+      "timestamp": "2026-04-03T20:48:11.241199"
+    },
+    {
+      "test_name": "All Tags API",
+      "success": true,
+      "details": "Retrieved 0 tags",
+      "response_data": {
+        "status": "ok",
+        "tags": []
+      },
+      "timestamp": "2026-04-03T20:48:11.345244"
+    },
+    {
+      "test_name": "Enhanced Search API",
+      "success": false,
+      "details": "HTTP 500",
+      "response_data": "Internal Server Error",
+      "timestamp": "2026-04-03T20:48:11.452085"
+    },
+    {
+      "test_name": "Smart Player Page Load",
+      "success": true,
+      "details": "Page loaded successfully (Content-Type: text/html; charset=utf-8)",
+      "response_data": null,
+      "timestamp": "2026-04-03T20:48:11.605789"
+    },
+    {
+      "test_name": "Video Player Page Load",
+      "success": true,
+      "details": "Page loaded successfully (Content-Type: text/html; charset=utf-8)",
+      "response_data": null,
+      "timestamp": "2026-04-03T20:48:11.713330"
+    },
+    {
+      "test_name": "Fast Player Page Load",
+      "success": true,
+      "details": "Page loaded successfully (Content-Type: text/html; charset=utf-8)",
+      "response_data": null,
+      "timestamp": "2026-04-03T20:48:11.856027"
+    }
+  ],
+  "summary": "Backend API testing completed",
+  "demo_mode": true,
+  "notes": "App running in DEMO MODE without real Telegram credentials"
+}

@@ -3,11 +3,16 @@ from utils.downloader import (
     get_file_info_from_url,
 )
 import asyncio
+import secrets
+import hashlib
+from datetime import datetime, timedelta
+from typing import Optional, Dict, Any
 from pathlib import Path
 from contextlib import asynccontextmanager
 import aiofiles
-from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form, Response
+from fastapi import FastAPI, HTTPException, Request, File, UploadFile, Form, Response, Query
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from config import ADMIN_PASSWORD, MAX_FILE_SIZE, STORAGE_CHANNEL
 from utils.clients import initialize_clients
 from utils.directoryHandler import getRandomID
@@ -16,6 +21,91 @@ from utils.streamer import media_streamer
 from utils.uploader import start_file_uploader
 from utils.logger import Logger
 import urllib.parse
+
+
+# ============================================================================
+# TOKEN MANAGEMENT FOR SECURE ACCESS
+# ============================================================================
+
+ACCESS_TOKENS: Dict[str, Dict[str, Any]] = {}
+TOKEN_EXPIRY_HOURS = 24
+
+def generate_secure_token() -> str:
+    """Generate a cryptographically secure token"""
+    return secrets.token_urlsafe(32)
+
+def hash_password(password: str) -> str:
+    """Hash a password for secure storage"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def create_access_token(file_path: str, expiry_hours: int = TOKEN_EXPIRY_HOURS, password: Optional[str] = None) -> Dict[str, Any]:
+    """Create a temporary access token for a file"""
+    token = generate_secure_token()
+    expires_at = datetime.now() + timedelta(hours=expiry_hours)
+    
+    ACCESS_TOKENS[token] = {
+        "file_path": file_path,
+        "expires_at": expires_at,
+        "password_protected": password is not None,
+        "password_hash": hash_password(password) if password else None,
+        "created_at": datetime.now(),
+        "access_count": 0
+    }
+    return {"token": token, "expires_at": expires_at.isoformat()}
+
+def validate_access_token(token: str, password: Optional[str] = None) -> Optional[str]:
+    """Validate an access token and return the file path if valid"""
+    if token not in ACCESS_TOKENS:
+        return None
+    
+    token_data = ACCESS_TOKENS[token]
+    
+    if datetime.now() > token_data["expires_at"]:
+        del ACCESS_TOKENS[token]
+        return None
+    
+    if token_data["password_protected"]:
+        if not password or hash_password(password) != token_data["password_hash"]:
+            return None
+    
+    token_data["access_count"] += 1
+    return token_data["file_path"]
+
+async def cleanup_expired_tokens():
+    """Periodically clean up expired tokens"""
+    while True:
+        await asyncio.sleep(3600)
+        now = datetime.now()
+        expired = [t for t, d in ACCESS_TOKENS.items() if now > d["expires_at"]]
+        for token in expired:
+            del ACCESS_TOKENS[token]
+
+
+# ============================================================================
+# TAGS/CATEGORIES MANAGEMENT
+# ============================================================================
+
+FILE_TAGS: Dict[str, list] = {}
+
+def add_tags_to_file(file_id: str, tags: list) -> None:
+    """Add tags to a file"""
+    if file_id not in FILE_TAGS:
+        FILE_TAGS[file_id] = []
+    FILE_TAGS[file_id].extend([t.lower().strip() for t in tags if t.strip()])
+    FILE_TAGS[file_id] = list(set(FILE_TAGS[file_id]))
+
+def get_file_tags(file_id: str) -> list:
+    """Get tags for a file"""
+    return FILE_TAGS.get(file_id, [])
+
+def search_by_tags(tags: list) -> list:
+    """Search files by tags"""
+    tags = [t.lower().strip() for t in tags]
+    results = []
+    for file_id, file_tags in FILE_TAGS.items():
+        if any(tag in file_tags for tag in tags):
+            results.append(file_id)
+    return results
 
 
 # Startup Event
@@ -29,12 +119,25 @@ async def lifespan(app: FastAPI):
 
     # Start the website auto ping task
     asyncio.create_task(auto_ping_website())
+    
+    # Start token cleanup task
+    asyncio.create_task(cleanup_expired_tokens())
 
     yield
 
 
-app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(docs_url="/docs", redoc_url="/redoc", lifespan=lifespan)
 logger = Logger(__name__)
+
+# Add CORS middleware for browser compatibility
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["Content-Length", "Content-Range", "Accept-Ranges"]
+)
 
 
 @app.get("/")
@@ -45,6 +148,12 @@ async def home_page():
 @app.get("/stream")
 async def stream_page():
     return FileResponse("website/VideoPlayer.html")
+
+
+@app.get("/smart-player")
+async def smart_player_page():
+    """Serve the enhanced smart video player"""
+    return FileResponse("website/SmartPlayer.html")
 
 
 @app.get("/fast-player")
@@ -89,6 +198,76 @@ async def dl_file(request: Request):
         channel = file.source_channel
     else:
         # Use storage channel for regular files
+        channel = STORAGE_CHANNEL
+    
+    return await media_streamer(channel, file.file_id, file.name, request)
+
+
+# CORS preflight handler for /file endpoint
+@app.options("/file")
+async def file_options():
+    """Handle CORS preflight for file endpoint"""
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization",
+            "Access-Control-Max-Age": "86400"
+        }
+    )
+
+
+# HEAD request handler for file metadata
+@app.head("/file")
+async def file_head(request: Request):
+    """Handle HEAD requests for file metadata"""
+    from utils.directoryHandler import DRIVE_DATA
+    import mimetypes
+    from urllib.parse import quote
+    
+    path = request.query_params.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="Path parameter required")
+    
+    try:
+        file = DRIVE_DATA.get_file(path)
+        mime_type = mimetypes.guess_type(file.name.lower())[0] or "application/octet-stream"
+        
+        return Response(
+            status_code=200,
+            headers={
+                "Content-Type": mime_type,
+                "Content-Length": str(file.size),
+                "Accept-Ranges": "bytes",
+                "Content-Disposition": f'inline; filename="{quote(file.name)}"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="File not found")
+
+
+# Secure token-based file access
+@app.get("/secure/{token}")
+async def secure_file_access(token: str, request: Request, password: Optional[str] = Query(None)):
+    """
+    Access a file using a secure temporary token.
+    URL format: /secure/{token}?password=optional_password
+    """
+    file_path = validate_access_token(token, password)
+    if not file_path:
+        raise HTTPException(status_code=403, detail="Invalid, expired, or password-protected token")
+    
+    from utils.directoryHandler import DRIVE_DATA
+    
+    try:
+        file = DRIVE_DATA.get_file(file_path)
+    except Exception:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if hasattr(file, 'is_fast_import') and file.is_fast_import and file.source_channel:
+        channel = file.source_channel
+    else:
         channel = STORAGE_CHANNEL
     
     return await media_streamer(channel, file.file_id, file.name, request)
@@ -578,3 +757,206 @@ async def check_video_encoding_support(request: Request):
     except Exception as e:
         logger.error(f"Error checking encoding support: {e}")
         return JSONResponse({"status": str(e)})
+
+
+
+# ============================================================================
+# TOKEN MANAGEMENT API
+# ============================================================================
+
+@app.post("/api/createShareToken")
+async def create_share_token(request: Request):
+    """Create a temporary share token for a file"""
+    from utils.directoryHandler import DRIVE_DATA
+    
+    data = await request.json()
+    
+    if data.get("password") != ADMIN_PASSWORD:
+        return JSONResponse({"status": "Invalid password"})
+    
+    file_path = data.get("path")
+    expiry_hours = data.get("expiry_hours", TOKEN_EXPIRY_HOURS)
+    file_password = data.get("file_password")
+    
+    if not file_path:
+        return JSONResponse({"status": "Path required"})
+    
+    try:
+        DRIVE_DATA.get_file(file_path)
+    except Exception:
+        return JSONResponse({"status": "File not found"})
+    
+    token_info = create_access_token(file_path, expiry_hours, file_password)
+    
+    base_url = str(request.base_url).rstrip('/')
+    share_url = f"{base_url}/secure/{token_info['token']}"
+    if file_password:
+        share_url += "?password=YOUR_PASSWORD"
+    
+    return JSONResponse({
+        "status": "ok",
+        "token": token_info["token"],
+        "expires_at": token_info["expires_at"],
+        "share_url": share_url,
+        "password_protected": file_password is not None
+    })
+
+
+@app.post("/api/revokeShareToken")
+async def revoke_share_token(request: Request):
+    """Revoke a share token"""
+    data = await request.json()
+    
+    if data.get("password") != ADMIN_PASSWORD:
+        return JSONResponse({"status": "Invalid password"})
+    
+    token = data.get("token")
+    if token in ACCESS_TOKENS:
+        del ACCESS_TOKENS[token]
+        return JSONResponse({"status": "ok", "message": "Token revoked"})
+    
+    return JSONResponse({"status": "Token not found"})
+
+
+# ============================================================================
+# TAGS/CATEGORIES API
+# ============================================================================
+
+@app.post("/api/addTags")
+async def add_tags(request: Request):
+    """Add tags to a file"""
+    from utils.directoryHandler import DRIVE_DATA
+    
+    data = await request.json()
+    
+    if data.get("password") != ADMIN_PASSWORD:
+        return JSONResponse({"status": "Invalid password"})
+    
+    file_path = data.get("path")
+    tags = data.get("tags", [])
+    
+    if not file_path:
+        return JSONResponse({"status": "Path required"})
+    
+    try:
+        file = DRIVE_DATA.get_file(file_path)
+        add_tags_to_file(file.id, tags)
+        return JSONResponse({"status": "ok", "tags": get_file_tags(file.id)})
+    except Exception as e:
+        return JSONResponse({"status": str(e)})
+
+
+@app.post("/api/getTags")
+async def get_tags(request: Request):
+    """Get tags for a file"""
+    from utils.directoryHandler import DRIVE_DATA
+    
+    data = await request.json()
+    file_path = data.get("path")
+    
+    if not file_path:
+        return JSONResponse({"status": "Path required"})
+    
+    try:
+        file = DRIVE_DATA.get_file(file_path)
+        return JSONResponse({"status": "ok", "tags": get_file_tags(file.id)})
+    except Exception:
+        return JSONResponse({"status": "File not found"})
+
+
+@app.post("/api/searchByTags")
+async def search_tags(request: Request):
+    """Search files by tags"""
+    data = await request.json()
+    tags = data.get("tags", [])
+    
+    if not tags:
+        return JSONResponse({"status": "Tags required"})
+    
+    file_ids = search_by_tags(tags)
+    return JSONResponse({"status": "ok", "file_ids": file_ids, "count": len(file_ids)})
+
+
+@app.get("/api/allTags")
+async def get_all_tags():
+    """Get all unique tags in the system"""
+    all_tags = set()
+    for tags in FILE_TAGS.values():
+        all_tags.update(tags)
+    return JSONResponse({"status": "ok", "tags": sorted(list(all_tags))})
+
+
+# ============================================================================
+# ENHANCED SEARCH API
+# ============================================================================
+
+@app.post("/api/search")
+async def enhanced_search(request: Request):
+    """
+    Enhanced search endpoint supporting:
+    - Filename search
+    - Tag search
+    - Combined search
+    """
+    from utils.directoryHandler import DRIVE_DATA
+    
+    data = await request.json()
+    query = data.get("query", "").strip()
+    tags = data.get("tags", [])
+    file_type = data.get("type")
+    
+    results = []
+    
+    if query:
+        name_results = DRIVE_DATA.search_file_folder(query)
+        for file_id, file_obj in name_results.items():
+            if file_obj.type == "file":
+                results.append({
+                    "id": file_obj.id,
+                    "name": file_obj.name,
+                    "size": file_obj.size,
+                    "path": file_obj.path,
+                    "tags": get_file_tags(file_obj.id)
+                })
+    
+    if tags:
+        tag_file_ids = search_by_tags(tags)
+        if query:
+            results = [r for r in results if r["id"] in tag_file_ids]
+        else:
+            for file_id in tag_file_ids:
+                results.append({
+                    "id": file_id,
+                    "tags": get_file_tags(file_id)
+                })
+    
+    if file_type:
+        type_extensions = {
+            "video": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".m4v"],
+            "audio": [".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a"],
+            "document": [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"],
+            "image": [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"]
+        }
+        if file_type in type_extensions:
+            exts = type_extensions[file_type]
+            results = [r for r in results if any(r.get("name", "").lower().endswith(ext) for ext in exts)]
+    
+    return JSONResponse({
+        "status": "ok",
+        "results": results,
+        "count": len(results)
+    })
+
+
+# ============================================================================
+# HEALTH CHECK
+# ============================================================================
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint"""
+    return JSONResponse({
+        "status": "ok",
+        "version": "2.0.0",
+        "features": ["streaming", "range-requests", "tokens", "tags", "search"]
+    })
