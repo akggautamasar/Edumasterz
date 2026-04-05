@@ -29,6 +29,8 @@ async def get_file_ids(client: Client, chat_id, message_id) -> Optional[FileId]:
     setattr(file_id, "mime_type", getattr(media, "mime_type", ""))
     setattr(file_id, "file_name", getattr(media, "file_name", ""))
     setattr(file_id, "unique_id", file_unique_id)
+    # Store the original file_id string for streaming
+    setattr(file_id, "file_id", media.file_id)
     return file_id
 
 

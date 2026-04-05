@@ -78,7 +78,8 @@ class ByteStreamer:
             # Use Pyrogram's stream_media which handles DC migration automatically
             # stream_media returns an async generator of chunks
             chunk_count = 0
-            async for chunk in client.stream_media(file_id, offset=offset, limit=chunk_size):
+            # file_id.file_id contains the original string file_id
+            async for chunk in client.stream_media(file_id.file_id, offset=offset, limit=chunk_size):
                 if not chunk:
                     logger.debug(f"Empty chunk received at part {current_part}")
                     break
