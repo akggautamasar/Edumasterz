@@ -57,7 +57,7 @@ class ByteStreamer:
         self.cached_file_ids[message_id] = file_id
         return self.cached_file_ids[message_id]
 
-    async def generate_media_session(self, client: Client, file_id: FileId):
+    async def generate_media_session(self, client: Client, file_id: FileId, dc_id: int = None):
         """
         Returns the appropriate session/client for streaming from the DC that contains the media file.
 
@@ -65,17 +65,28 @@ class ByteStreamer:
         The Pyrogram client automatically manages sessions for different DCs, so we don't need
         to manually create Session objects (which is incompatible with KurimuzonAkuma fork).
 
+        Args:
+            client: Pyrogram client instance
+            file_id: File identifier object
+            dc_id: Optional DC ID to force session creation for (used for migration)
+
         Returns:
             The media session object from client.media_sessions, or the client itself for streaming
         """
-        dc_id = file_id.dc_id
+        # Use provided dc_id or get from file_id
+        target_dc = dc_id if dc_id is not None else file_id.dc_id
+
+        # If dc_id is explicitly provided, update file_id's dc_id (migration case)
+        if dc_id is not None:
+            file_id.dc_id = dc_id
+            logger.info(f"Forcing session creation for DC {target_dc} (migration)")
 
         # Check if we have a cached media session for this DC
-        media_session = client.media_sessions.get(dc_id, None)
+        media_session = client.media_sessions.get(target_dc, None)
 
-        if media_session is not None:
+        if media_session is not None and dc_id is None:  # Don't use cached session if forcing DC
             # Validate the cached session
-            logger.debug(f"Found cached media session for DC {dc_id}, validating...")
+            logger.debug(f"Found cached media session for DC {target_dc}, validating...")
 
             try:
                 # Basic validation: check if session has required attributes and is started
@@ -83,25 +94,36 @@ class ByteStreamer:
                     media_session.is_started and
                     hasattr(media_session, 'auth_key') and
                     media_session.auth_key is not None):
-                    logger.info(f"Using validated cached media session for DC {dc_id}")
+                    logger.info(f"Using validated cached media session for DC {target_dc}")
                     return media_session
                 else:
-                    logger.warning(f"Cached session for DC {dc_id} is invalid, will recreate")
+                    logger.warning(f"Cached session for DC {target_dc} is invalid, will recreate")
                     try:
                         await media_session.stop()
                     except:
                         pass
-                    del client.media_sessions[dc_id]
+                    del client.media_sessions[target_dc]
                     media_session = None
             except Exception as e:
-                logger.warning(f"Error validating cached session for DC {dc_id}: {e}, removing from cache")
-                if dc_id in client.media_sessions:
-                    del client.media_sessions[dc_id]
+                logger.warning(f"Error validating cached session for DC {target_dc}: {e}, removing from cache")
+                if target_dc in client.media_sessions:
+                    del client.media_sessions[target_dc]
                 media_session = None
 
+        # If forcing DC migration, invalidate old session
+        if dc_id is not None and target_dc in client.media_sessions:
+            logger.info(f"Invalidating old cached session for DC {target_dc}")
+            try:
+                old_session = client.media_sessions[target_dc]
+                if hasattr(old_session, 'stop'):
+                    await old_session.stop()
+            except:
+                pass
+            del client.media_sessions[target_dc]
+
         # If no valid cached session, get or create one using the client's internal methods
-        if media_session is None:
-            logger.info(f"No valid cached session for DC {dc_id}, checking client's media_sessions")
+        if media_session is None or dc_id is not None:
+            logger.info(f"Creating new session for DC {target_dc}")
 
             # Let Pyrogram's internal session management handle this
             # The client.media_sessions dict is managed by Pyrogram itself
@@ -109,22 +131,22 @@ class ByteStreamer:
 
             try:
                 client_dc_id = await client.storage.dc_id()
-                logger.debug(f"Client DC: {client_dc_id}, File DC: {dc_id}")
+                logger.debug(f"Client DC: {client_dc_id}, File DC: {target_dc}")
 
                 # Pyrogram will automatically create the necessary session when we invoke methods
                 # We can trigger this by getting the session from the client's internal pool
-                if dc_id not in client.media_sessions:
-                    logger.info(f"DC {dc_id} not in media_sessions, will be created on first invoke")
+                if target_dc not in client.media_sessions:
+                    logger.info(f"DC {target_dc} not in media_sessions, will be created on first invoke")
 
                 # Return the client itself - Pyrogram will handle DC routing internally
                 # when we call invoke() on it during streaming
-                logger.info(f"Reusing main client for media streaming on DC {dc_id}")
+                logger.info(f"Reusing main client for media streaming on DC {target_dc}")
                 return client
 
             except Exception as e:
                 logger.error(f"Error checking DC info: {e}")
                 # Fall back to using the client directly
-                logger.info(f"Falling back to main client for DC {dc_id} streaming")
+                logger.info(f"Falling back to main client for DC {target_dc} streaming")
                 return client
 
         return media_session
@@ -141,23 +163,10 @@ class ByteStreamer:
         Returns:
             Media session for the target DC
         """
-        logger.info(f"FileMigrate detected to DC {target_dc} - switching session")
+        logger.warning(f"FileMigrate detected to DC {target_dc} - switching session")
 
-        # Update the file_id's DC
-        file_id.dc_id = target_dc
-
-        # Invalidate old cached session if exists
-        if target_dc in client.media_sessions:
-            try:
-                old_session = client.media_sessions[target_dc]
-                if hasattr(old_session, 'stop'):
-                    await old_session.stop()
-            except:
-                pass
-            del client.media_sessions[target_dc]
-
-        # Generate new session for target DC
-        media_session = await self.generate_media_session(client, file_id)
+        # Generate new session for target DC (this will update file_id.dc_id and invalidate cache)
+        media_session = await self.generate_media_session(client, file_id, dc_id=target_dc)
 
         logger.info(f"Successfully migrated to DC {target_dc}")
         return media_session
@@ -265,33 +274,35 @@ class ByteStreamer:
                     )
                     break
                 except FileMigrate as e:
-                    # Extract target DC from error message
-                    # Error format: "The file currently being accessed is stored in DC1"
-                    error_msg = str(e)
+                    # Extract target DC from Pyrogram FileMigrate exception
+                    # The exception has a 'value' attribute containing the DC number
                     target_dc = None
 
-                    # Try to extract DC number from error message
-                    match = re.search(r'DC[_\s]?(\d+)', error_msg, re.IGNORECASE)
-                    if match:
-                        target_dc = int(match.group(1))
+                    # Primary method: get from exception.value (Pyrogram stores DC number here)
+                    if hasattr(e, 'value') and e.value:
+                        target_dc = e.value
+                    # Fallback: parse from error message [400 FILE_MIGRATE_X]
+                    elif hasattr(e, 'x') and e.x:
+                        target_dc = e.x
+                    else:
+                        # Last resort: regex parse from string representation
+                        error_msg = str(e)
+                        match = re.search(r'FILE_MIGRATE[_\s]?(\d+)', error_msg, re.IGNORECASE)
+                        if not match:
+                            match = re.search(r'DC[_\s]?(\d+)', error_msg, re.IGNORECASE)
+                        if match:
+                            target_dc = int(match.group(1))
 
                     if not target_dc:
-                        # Fallback: try to get from exception attributes
-                        if hasattr(e, 'value'):
-                            target_dc = e.value
-                        elif hasattr(e, 'x'):
-                            target_dc = e.x
-
-                    if not target_dc:
-                        logger.error(f"Could not extract target DC from FileMigrate error: {error_msg}")
+                        logger.error(f"Could not extract target DC from FileMigrate error: {e}")
                         raise
 
-                    logger.info(f"FileMigrate detected to DC {target_dc} - switching session (attempt {attempt + 1}/{max_retries})")
+                    logger.warning(f"FileMigrate detected to DC {target_dc} - switching session (attempt {attempt + 1}/{max_retries})")
 
-                    # Handle DC migration
+                    # Handle DC migration and get new session
                     media_session = await self.handle_dc_migration(client, target_dc, file_id)
 
-                    # Update location with new file_id
+                    # Update location with new file_id (DC has been updated)
                     location = await self.get_location(file_id)
 
                     logger.info(f"Successfully migrated to DC {target_dc}, retrying GetFile")
@@ -339,32 +350,34 @@ class ByteStreamer:
                             )
                             break
                         except FileMigrate as e:
-                            # Extract target DC from error message
-                            error_msg = str(e)
+                            # Extract target DC from Pyrogram FileMigrate exception
                             target_dc = None
 
-                            # Try to extract DC number from error message
-                            match = re.search(r'DC[_\s]?(\d+)', error_msg, re.IGNORECASE)
-                            if match:
-                                target_dc = int(match.group(1))
+                            # Primary method: get from exception.value (Pyrogram stores DC number here)
+                            if hasattr(e, 'value') and e.value:
+                                target_dc = e.value
+                            # Fallback: parse from exception.x attribute
+                            elif hasattr(e, 'x') and e.x:
+                                target_dc = e.x
+                            else:
+                                # Last resort: regex parse from string representation
+                                error_msg = str(e)
+                                match = re.search(r'FILE_MIGRATE[_\s]?(\d+)', error_msg, re.IGNORECASE)
+                                if not match:
+                                    match = re.search(r'DC[_\s]?(\d+)', error_msg, re.IGNORECASE)
+                                if match:
+                                    target_dc = int(match.group(1))
 
                             if not target_dc:
-                                # Fallback: try to get from exception attributes
-                                if hasattr(e, 'value'):
-                                    target_dc = e.value
-                                elif hasattr(e, 'x'):
-                                    target_dc = e.x
-
-                            if not target_dc:
-                                logger.error(f"Could not extract target DC from FileMigrate error: {error_msg}")
+                                logger.error(f"Could not extract target DC from FileMigrate error: {e}")
                                 raise
 
-                            logger.info(f"FileMigrate detected to DC {target_dc} - switching session (attempt {attempt + 1}/{max_retries})")
+                            logger.warning(f"FileMigrate detected to DC {target_dc} - switching session (attempt {attempt + 1}/{max_retries})")
 
-                            # Handle DC migration
+                            # Handle DC migration and get new session
                             media_session = await self.handle_dc_migration(client, target_dc, file_id)
 
-                            # Update location with new file_id
+                            # Update location with new file_id (DC has been updated)
                             location = await self.get_location(file_id)
 
                             logger.info(f"Successfully migrated to DC {target_dc}, retrying GetFile")
