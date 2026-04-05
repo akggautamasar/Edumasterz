@@ -57,266 +57,75 @@ class ByteStreamer:
         self.cached_file_ids[message_id] = file_id
         return self.cached_file_ids[message_id]
 
-    async def _create_session_with_fallback(
-        self,
-        client: Client,
-        dc_id: int,
-        auth_key: bytes,
-        test_mode: bool,
-        context: str = ""
-    ) -> Session:
+    async def generate_media_session(self, client: Client, file_id: FileId):
         """
-        Create a Session object with robust fallback handling.
+        Returns the appropriate session/client for streaming from the DC that contains the media file.
 
-        Args:
-            client: Pyrogram client instance
-            dc_id: Data center ID
-            auth_key: Authorization key bytes
-            test_mode: Whether in test mode
-            context: Context string for logging (e.g., "different DC" or "same DC")
+        SIMPLIFIED APPROACH: Reuses the main Pyrogram client which handles DC connections internally.
+        The Pyrogram client automatically manages sessions for different DCs, so we don't need
+        to manually create Session objects (which is incompatible with KurimuzonAkuma fork).
 
         Returns:
-            Initialized Session object
-
-        Raises:
-            Exception: If all session creation attempts fail
-        """
-        logger.info(f"Creating session for DC {dc_id} ({context}): test_mode={test_mode}, auth_key_len={len(auth_key) if auth_key else 0}")
-        logger.debug(f"Session class: {Session}, Module: {Session.__module__}")
-
-        # Attempt 1: Using explicit KEYWORD arguments (KurimuzonAkuma fork requirement)
-        try:
-            logger.debug(f"[DC {dc_id}] Attempt 1: Session(client=client, dc_id={dc_id}, auth_key=..., test_mode={test_mode}, is_media=True)")
-            media_session = Session(
-                client=client,
-                dc_id=dc_id,
-                auth_key=auth_key,
-                test_mode=test_mode,
-                is_media=True,
-            )
-            await media_session.start()
-            logger.info(f"[DC {dc_id}] ✓ Session created successfully with KEYWORD args and is_media=True")
-            return media_session
-        except TypeError as e:
-            logger.warning(f"[DC {dc_id}] ✗ TypeError with keyword args and is_media=True: {e}")
-        except Exception as e:
-            logger.error(f"[DC {dc_id}] ✗ Failed with keyword args and is_media=True: {type(e).__name__}: {e}")
-            raise
-
-        # Attempt 2: Without is_media parameter (fallback)
-        try:
-            logger.debug(f"[DC {dc_id}] Attempt 2: Session(client=client, dc_id={dc_id}, auth_key=..., test_mode={test_mode})")
-            media_session = Session(
-                client=client,
-                dc_id=dc_id,
-                auth_key=auth_key,
-                test_mode=test_mode
-            )
-            await media_session.start()
-            logger.info(f"[DC {dc_id}] ✓ Session created successfully with KEYWORD args (no is_media)")
-            return media_session
-        except TypeError as e:
-            logger.error(f"[DC {dc_id}] ✗ TypeError with keyword args (no is_media): {e}")
-        except Exception as e:
-            logger.error(f"[DC {dc_id}] ✗ Failed with keyword args (no is_media): {type(e).__name__}: {e}")
-            raise
-
-        # Attempt 3: Positional arguments as last resort
-        try:
-            logger.debug(f"[DC {dc_id}] Attempt 3: Session(client, {dc_id}, auth_key, {test_mode}, is_media=True) [POSITIONAL]")
-            media_session = Session(
-                client,
-                dc_id,
-                auth_key,
-                test_mode,
-                is_media=True,
-            )
-            await media_session.start()
-            logger.info(f"[DC {dc_id}] ✓ Session created successfully with POSITIONAL args")
-            return media_session
-        except TypeError as e:
-            logger.error(f"[DC {dc_id}] ✗ TypeError with positional args: {e}")
-            error_msg = (
-                f"CRITICAL: Failed to create Session for DC {dc_id} after 3 attempts. "
-                f"Tried: keyword args with is_media, keyword args without is_media, positional args. "
-                f"Last error: {e}. "
-                f"Session class: {Session.__module__}.{Session.__name__}. "
-                f"This indicates a Pyrogram API incompatibility."
-            )
-            raise TypeError(error_msg) from e
-        except Exception as e:
-            logger.error(f"[DC {dc_id}] ✗ Failed with positional args: {type(e).__name__}: {e}")
-            raise
-
-    async def generate_media_session(self, client: Client, file_id: FileId) -> Session:
-        """
-        Generates the media session for the DC that contains the media file.
-        This is required for getting the bytes from Telegram servers.
-
-        Fixed for KurimuzonAkuma Pyrogram fork compatibility.
-        Includes robust validation and fallback mechanisms.
+            The media session object from client.media_sessions, or the client itself for streaming
         """
         dc_id = file_id.dc_id
+
+        # Check if we have a cached media session for this DC
         media_session = client.media_sessions.get(dc_id, None)
 
-        # Strict validation of cached session
         if media_session is not None:
+            # Validate the cached session
             logger.debug(f"Found cached media session for DC {dc_id}, validating...")
 
-            is_valid = True
-            validation_errors = []
-
             try:
-                # Check 1: Has auth_key attribute
-                if not hasattr(media_session, 'auth_key'):
-                    is_valid = False
-                    validation_errors.append("missing auth_key attribute")
-                elif media_session.auth_key is None:
-                    is_valid = False
-                    validation_errors.append("auth_key is None")
-
-                # Check 2: Has test_mode attribute
-                if not hasattr(media_session, 'test_mode'):
-                    is_valid = False
-                    validation_errors.append("missing test_mode attribute")
-
-                # Check 3: Session is started
-                if not hasattr(media_session, 'is_started'):
-                    is_valid = False
-                    validation_errors.append("missing is_started attribute")
-                elif hasattr(media_session, 'is_started') and not media_session.is_started:
-                    is_valid = False
-                    validation_errors.append("session not started")
-
+                # Basic validation: check if session has required attributes and is started
+                if (hasattr(media_session, 'is_started') and
+                    media_session.is_started and
+                    hasattr(media_session, 'auth_key') and
+                    media_session.auth_key is not None):
+                    logger.info(f"Using validated cached media session for DC {dc_id}")
+                    return media_session
+                else:
+                    logger.warning(f"Cached session for DC {dc_id} is invalid, will recreate")
+                    try:
+                        await media_session.stop()
+                    except:
+                        pass
+                    del client.media_sessions[dc_id]
+                    media_session = None
             except Exception as e:
-                is_valid = False
-                validation_errors.append(f"exception during validation: {e}")
-
-            if not is_valid:
-                logger.warning(
-                    f"Cached session for DC {dc_id} is INVALID (reasons: {', '.join(validation_errors)}). "
-                    f"Forcing recreation..."
-                )
-                try:
-                    await media_session.stop()
-                except:
-                    pass
-
+                logger.warning(f"Error validating cached session for DC {dc_id}: {e}, removing from cache")
                 if dc_id in client.media_sessions:
                     del client.media_sessions[dc_id]
                 media_session = None
-            else:
-                logger.debug(f"Cached session for DC {dc_id} passed all validation checks ✓")
 
+        # If no valid cached session, get or create one using the client's internal methods
         if media_session is None:
-            logger.info(f"Creating new media session for DC {dc_id}")
+            logger.info(f"No valid cached session for DC {dc_id}, checking client's media_sessions")
 
-            # Get test_mode from client storage (defaults to False for production)
+            # Let Pyrogram's internal session management handle this
+            # The client.media_sessions dict is managed by Pyrogram itself
+            # We just need to ensure the client has access to the DC
+
             try:
-                test_mode = await client.storage.test_mode()
-                logger.debug(f"Retrieved test_mode from client storage: {test_mode}")
+                client_dc_id = await client.storage.dc_id()
+                logger.debug(f"Client DC: {client_dc_id}, File DC: {dc_id}")
+
+                # Pyrogram will automatically create the necessary session when we invoke methods
+                # We can trigger this by getting the session from the client's internal pool
+                if dc_id not in client.media_sessions:
+                    logger.info(f"DC {dc_id} not in media_sessions, will be created on first invoke")
+
+                # Return the client itself - Pyrogram will handle DC routing internally
+                # when we call invoke() on it during streaming
+                logger.info(f"Reusing main client for media streaming on DC {dc_id}")
+                return client
+
             except Exception as e:
-                logger.warning(f"Failed to get test_mode from storage, defaulting to False: {e}")
-                test_mode = False
-
-            client_dc_id = await client.storage.dc_id()
-            logger.debug(f"Client DC: {client_dc_id}, File DC: {dc_id}")
-
-            if dc_id != client_dc_id:
-                # Need to create auth for different DC
-                logger.info(f"File is on different DC ({dc_id}), creating new auth...")
-
-                # Get DC address for the target DC
-                dc_addresses = DC_ADDRESSES_TEST if test_mode else DC_ADDRESSES
-
-                if dc_id in dc_addresses:
-                    server_address, port = dc_addresses[dc_id]
-                else:
-                    # Fallback to default address pattern
-                    server_address = f"149.154.167.{40 + dc_id}"
-                    port = 443
-
-                logger.info(f"Creating auth for DC {dc_id} at {server_address}:{port} (test_mode={test_mode})")
-
-                try:
-                    # New Auth signature: Auth(client, dc_id, server_address, port, test_mode)
-                    auth = Auth(
-                        client,
-                        dc_id,
-                        server_address,
-                        port,
-                        test_mode
-                    )
-                    auth_key = await auth.create()
-                    logger.info(f"Auth key created for DC {dc_id}, length: {len(auth_key)}")
-                except Exception as e:
-                    logger.error(f"CRITICAL: Failed to create auth for DC {dc_id}: {type(e).__name__}: {e}")
-                    raise
-
-                # Create session with robust fallback
-                media_session = await self._create_session_with_fallback(
-                    client,
-                    dc_id,
-                    auth_key,
-                    test_mode,
-                    context="different DC"
-                )
-
-                # Export and import authorization
-                logger.info(f"Exporting and importing authorization for DC {dc_id}")
-                for attempt in range(6):
-                    try:
-                        exported_auth = await client.invoke(
-                            raw.functions.auth.ExportAuthorization(dc_id=dc_id)
-                        )
-
-                        await media_session.invoke(
-                            raw.functions.auth.ImportAuthorization(
-                                id=exported_auth.id, bytes=exported_auth.bytes
-                            )
-                        )
-                        logger.info(f"✓ Successfully imported auth for DC {dc_id} on attempt {attempt + 1}")
-                        break
-                    except AuthBytesInvalid:
-                        logger.warning(f"Invalid authorization bytes for DC {dc_id}, attempt {attempt + 1}/6")
-                        if attempt == 5:
-                            await media_session.stop()
-                            raise AuthBytesInvalid
-                        continue
-                    except Exception as e:
-                        logger.error(f"Auth import error for DC {dc_id} on attempt {attempt + 1}/6: {type(e).__name__}: {e}")
-                        if attempt == 5:
-                            await media_session.stop()
-                            raise
-            else:
-                # Same DC as client, use existing auth key
-                logger.info(f"File is on same DC as client ({dc_id}), reusing client auth key")
-
-                try:
-                    auth_key = await client.storage.auth_key()
-                    logger.debug(f"Retrieved auth_key from client storage, length: {len(auth_key) if auth_key else 0}")
-
-                    if not auth_key:
-                        raise ValueError(f"Client storage returned empty auth_key for DC {dc_id}")
-
-                    # Create session with robust fallback
-                    media_session = await self._create_session_with_fallback(
-                        client,
-                        dc_id,
-                        auth_key,
-                        test_mode,
-                        context="same DC"
-                    )
-
-                except Exception as e:
-                    logger.error(f"CRITICAL: Failed to create session for same DC {dc_id}: {type(e).__name__}: {e}")
-                    raise
-
-            # Cache the newly created session
-            logger.info(f"Caching media session for DC {dc_id}")
-            client.media_sessions[dc_id] = media_session
-        else:
-            logger.info(f"Using validated cached media session for DC {dc_id}")
+                logger.error(f"Error checking DC info: {e}")
+                # Fall back to using the client directly
+                logger.info(f"Falling back to main client for DC {dc_id} streaming")
+                return client
 
         return media_session
 
