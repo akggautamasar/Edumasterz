@@ -250,60 +250,57 @@ class ByteStreamer:
         location = await self.get_location(file_id)
 
         try:
-            # Helper function to fetch a chunk with FileMigrate handling
-            async def fetch_chunk(session, loc, off, lim, max_retries=3):
-                for attempt in range(max_retries):
-                    try:
-                        return await session.invoke(
-                            raw.functions.upload.GetFile(
-                                location=loc, offset=off, limit=lim
-                            ),
-                        )
-                    except FileMigrate as e:
-                        # Extract target DC from error message
-                        # Error format: "The file currently being accessed is stored in DC1"
-                        error_msg = str(e)
-                        target_dc = None
+            import re
 
-                        # Try to extract DC number from error message
-                        import re
-                        match = re.search(r'DC[_\s]?(\d+)', error_msg, re.IGNORECASE)
-                        if match:
-                            target_dc = int(match.group(1))
+            # Fetch first chunk with FileMigrate handling
+            max_retries = 3
+            r = None
 
-                        if not target_dc:
-                            # Fallback: try to get from exception attributes
-                            if hasattr(e, 'value'):
-                                target_dc = e.value
-                            elif hasattr(e, 'x'):
-                                target_dc = e.x
+            for attempt in range(max_retries):
+                try:
+                    r = await media_session.invoke(
+                        raw.functions.upload.GetFile(
+                            location=location, offset=offset, limit=chunk_size
+                        ),
+                    )
+                    break
+                except FileMigrate as e:
+                    # Extract target DC from error message
+                    # Error format: "The file currently being accessed is stored in DC1"
+                    error_msg = str(e)
+                    target_dc = None
 
-                        if not target_dc:
-                            logger.error(f"Could not extract target DC from FileMigrate error: {error_msg}")
-                            raise
+                    # Try to extract DC number from error message
+                    match = re.search(r'DC[_\s]?(\d+)', error_msg, re.IGNORECASE)
+                    if match:
+                        target_dc = int(match.group(1))
 
-                        logger.info(f"FileMigrate detected to DC {target_dc} - switching session (attempt {attempt + 1}/{max_retries})")
+                    if not target_dc:
+                        # Fallback: try to get from exception attributes
+                        if hasattr(e, 'value'):
+                            target_dc = e.value
+                        elif hasattr(e, 'x'):
+                            target_dc = e.x
 
-                        # Handle DC migration
-                        session = await self.handle_dc_migration(client, target_dc, file_id)
-
-                        # Update location with new file_id
-                        loc = await self.get_location(file_id)
-
-                        logger.info(f"Successfully migrated to DC {target_dc}, retrying GetFile")
-
-                        # Continue to next iteration to retry with new session
-                        continue
-
-                    except Exception as ex:
-                        # Other exceptions are re-raised
+                    if not target_dc:
+                        logger.error(f"Could not extract target DC from FileMigrate error: {error_msg}")
                         raise
 
-                # If we exhausted retries
-                raise Exception(f"Failed to fetch chunk after {max_retries} migration attempts")
+                    logger.info(f"FileMigrate detected to DC {target_dc} - switching session (attempt {attempt + 1}/{max_retries})")
 
-            # Fetch first chunk with migration handling
-            r = await fetch_chunk(media_session, location, offset, chunk_size)
+                    # Handle DC migration
+                    media_session = await self.handle_dc_migration(client, target_dc, file_id)
+
+                    # Update location with new file_id
+                    location = await self.get_location(file_id)
+
+                    logger.info(f"Successfully migrated to DC {target_dc}, retrying GetFile")
+
+                    # Continue to next iteration to retry with new session
+                    continue
+
+            if r is None:
+                raise Exception(f"Failed to fetch first chunk after {max_retries} migration attempts")
 
             if isinstance(r, raw.types.upload.File):
                 while True:
@@ -332,8 +329,51 @@ class ByteStreamer:
                     if current_part > part_count:
                         break
 
-                    # Fetch next chunk with migration handling
-                    r = await fetch_chunk(media_session, location, offset, chunk_size)
+                    # Fetch next chunk with FileMigrate handling
+                    for attempt in range(max_retries):
+                        try:
+                            r = await media_session.invoke(
+                                raw.functions.upload.GetFile(
+                                    location=location, offset=offset, limit=chunk_size
+                                ),
+                            )
+                            break
+                        except FileMigrate as e:
+                            # Extract target DC from error message
+                            error_msg = str(e)
+                            target_dc = None
+
+                            # Try to extract DC number from error message
+                            match = re.search(r'DC[_\s]?(\d+)', error_msg, re.IGNORECASE)
+                            if match:
+                                target_dc = int(match.group(1))
+
+                            if not target_dc:
+                                # Fallback: try to get from exception attributes
+                                if hasattr(e, 'value'):
+                                    target_dc = e.value
+                                elif hasattr(e, 'x'):
+                                    target_dc = e.x
+
+                            if not target_dc:
+                                logger.error(f"Could not extract target DC from FileMigrate error: {error_msg}")
+                                raise
+
+                            logger.info(f"FileMigrate detected to DC {target_dc} - switching session (attempt {attempt + 1}/{max_retries})")
+
+                            # Handle DC migration
+                            media_session = await self.handle_dc_migration(client, target_dc, file_id)
+
+                            # Update location with new file_id
+                            location = await self.get_location(file_id)
+
+                            logger.info(f"Successfully migrated to DC {target_dc}, retrying GetFile")
+
+                            # Continue to next iteration to retry with new session
+                            continue
+
+                    if r is None:
+                        raise Exception(f"Failed to fetch chunk at part {current_part} after {max_retries} migration attempts")
             else:
                 logger.warning(f"Unexpected response type: {type(r)}")
 
