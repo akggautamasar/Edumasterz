@@ -61,10 +61,24 @@ class ByteStreamer:
         """
         Generates the media session for the DC that contains the media file.
         This is required for getting the bytes from Telegram servers.
-        
+
         Fixed for KurimuzonAkuma Pyrogram fork compatibility.
         """
         media_session = client.media_sessions.get(file_id.dc_id, None)
+
+        # Validate cached session - if it's invalid/old, recreate it
+        if media_session is not None:
+            try:
+                # Check if the session is properly initialized
+                if not hasattr(media_session, 'auth_key') or media_session.auth_key is None:
+                    logger.warning(f"Cached session for DC {file_id.dc_id} is invalid, recreating...")
+                    media_session = None
+                    del client.media_sessions[file_id.dc_id]
+            except Exception as e:
+                logger.warning(f"Error validating cached session for DC {file_id.dc_id}: {e}, recreating...")
+                media_session = None
+                if file_id.dc_id in client.media_sessions:
+                    del client.media_sessions[file_id.dc_id]
 
         if media_session is None:
             test_mode = await client.storage.test_mode()
@@ -96,15 +110,34 @@ class ByteStreamer:
                 except Exception as e:
                     logger.error(f"Failed to create auth for DC {file_id.dc_id}: {e}")
                     raise
-                
-                media_session = Session(
-                    client,
-                    file_id.dc_id,
-                    auth_key,
-                    test_mode,
-                    is_media=True,
-                )
-                await media_session.start()
+
+                try:
+                    # Create Session with required arguments: client, dc_id, auth_key, test_mode
+                    media_session = Session(
+                        client,
+                        file_id.dc_id,
+                        auth_key,
+                        test_mode,
+                        is_media=True,
+                    )
+                    await media_session.start()
+                except TypeError as e:
+                    logger.error(f"Session creation failed with TypeError: {e}")
+                    # Fallback: try without is_media parameter in case of API mismatch
+                    try:
+                        media_session = Session(
+                            client,
+                            file_id.dc_id,
+                            auth_key,
+                            test_mode
+                        )
+                        await media_session.start()
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback session creation also failed: {fallback_error}")
+                        raise
+                except Exception as e:
+                    logger.error(f"Failed to create session for DC {file_id.dc_id}: {e}")
+                    raise
 
                 # Export and import authorization
                 for attempt in range(6):
@@ -133,14 +166,35 @@ class ByteStreamer:
                             raise
             else:
                 # Same DC, use existing auth key
-                media_session = Session(
-                    client,
-                    file_id.dc_id,
-                    await client.storage.auth_key(),
-                    test_mode,
-                    is_media=True,
-                )
-                await media_session.start()
+                try:
+                    auth_key = await client.storage.auth_key()
+                    # Create Session with required arguments: client, dc_id, auth_key, test_mode
+                    media_session = Session(
+                        client,
+                        file_id.dc_id,
+                        auth_key,
+                        test_mode,
+                        is_media=True,
+                    )
+                    await media_session.start()
+                except TypeError as e:
+                    logger.error(f"Session creation failed with TypeError: {e}")
+                    # Fallback: try without is_media parameter in case of API mismatch
+                    try:
+                        auth_key = await client.storage.auth_key()
+                        media_session = Session(
+                            client,
+                            file_id.dc_id,
+                            auth_key,
+                            test_mode
+                        )
+                        await media_session.start()
+                    except Exception as fallback_error:
+                        logger.error(f"Fallback session creation also failed: {fallback_error}")
+                        raise
+                except Exception as e:
+                    logger.error(f"Failed to create session for same DC {file_id.dc_id}: {e}")
+                    raise
                 
             logger.debug(f"Created media session for DC {file_id.dc_id}")
             client.media_sessions[file_id.dc_id] = media_session
