@@ -5,16 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fast Player</title>
     <style>
-        :root {
-            --primary: #0ea5e9;
-            --bg: #000;
-            --control-bg: rgba(0, 0, 0, 0.85);
-        }
+        :root { --primary: #0ea5e9; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#000; color:white; font-family:system-ui, sans-serif; overflow:hidden; }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; color: white; overflow: hidden; font-family: system-ui, -apple-system, sans-serif; }
-
-        .player-container {
+        .container {
             width: 100vw;
             height: 100vh;
             position: relative;
@@ -37,7 +32,6 @@
             justify-content: space-between;
             align-items: center;
             z-index: 100;
-            transition: opacity 0.3s;
         }
 
         .brand {
@@ -45,31 +39,24 @@
             align-items: center;
             gap: 10px;
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
         }
-
-        .brand .lightning { color: #fbbf24; }
 
         /* Bottom Controls */
         .bottom-controls {
             position: absolute;
             bottom: 0; left: 0; right: 0;
             background: linear-gradient(to top, rgba(0,0,0,0.95), transparent);
-            padding: 20px 15px 15px;
+            padding: 15px 20px 25px;
             z-index: 100;
-            transition: opacity 0.3s;
-        }
-
-        .progress-container {
-            margin-bottom: 12px;
         }
 
         .progress-bar {
-            height: 6px;
+            height: 5px;
             background: rgba(255,255,255,0.3);
             border-radius: 3px;
             cursor: pointer;
-            position: relative;
+            margin-bottom: 12px;
         }
 
         .progress-filled {
@@ -77,109 +64,97 @@
             background: var(--primary);
             border-radius: 3px;
             width: 0%;
-            transition: width 0.1s linear;
         }
 
         .controls-row {
             display: flex;
             align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
+            gap: 15px;
         }
 
         .btn {
-            background: rgba(255,255,255,0.15);
+            background: rgba(255,255,255,0.18);
             border: none;
             color: white;
-            width: 44px;
-            height: 44px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s;
+            font-size: 1.3rem;
         }
 
-        .btn:hover {
-            background: rgba(255,255,255,0.3);
-            transform: scale(1.1);
-        }
+        .btn:hover { background: rgba(255,255,255,0.35); }
 
         .play-pause-btn {
-            width: 52px;
-            height: 52px;
-            background: rgba(255,255,255,0.2);
+            width: 54px;
+            height: 54px;
+            font-size: 1.6rem;
         }
 
         .time {
-            font-size: 0.9rem;
-            min-width: 90px;
-            text-align: center;
+            font-size: 0.95rem;
+            min-width: 110px;
+            font-weight: 500;
         }
 
         /* Center Play Button */
         .center-play {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 90px;
-            height: 90px;
-            background: rgba(0,0,0,0.7);
+            width: 85px; height: 85px;
+            background: rgba(0,0,0,0.75);
             border: 3px solid white;
             border-radius: 50%;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            z-index: 50;
-            opacity: 0;
-            transition: all 0.3s;
+            z-index: 60;
         }
 
-        .center-play.show {
-            opacity: 1;
-        }
+        .center-play.show { display: flex; }
 
         .center-play svg {
-            width: 40px;
-            height: 40px;
-            margin-left: 6px;
-        }
-
-        /* Fullscreen Button - Made Prominent */
-        #fullscreenBtn {
-            background: rgba(255,255,255,0.25) !important;
-            font-size: 1.4rem;
+            width: 38px; height: 38px; margin-left: 5px;
         }
 
         /* Loading */
         .loading {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            width: 50px;
-            height: 50px;
+            width: 50px; height: 50px;
             border: 5px solid rgba(255,255,255,0.2);
-            border-top: 5px solid var(--primary);
+            border-top-color: var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            z-index: 60;
+            z-index: 70;
         }
 
         @keyframes spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
 
-        /* Hide cursor when inactive */
-        .inactive .bottom-controls,
-        .inactive .top-bar {
+        /* Double tap feedback */
+        .tap-feedback {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            pointer-events: none;
             opacity: 0;
+            transition: all 0.3s;
+            z-index: 80;
         }
     </style>
 </head>
 <body>
-    <div class="player-container" id="container">
+    <div class="container" id="container">
         <video id="video" preload="metadata"></video>
 
         <!-- Center Play Button -->
@@ -190,40 +165,37 @@
         <!-- Loading -->
         <div class="loading" id="loading"></div>
 
+        <!-- Tap Feedback -->
+        <div class="tap-feedback" id="tapFeedback"></div>
+
         <!-- Top Bar -->
-        <div class="top-bar" id="topBar">
+        <div class="top-bar">
             <div class="brand">
-                <span class="lightning">⚡</span>
-                <span>Fast Player</span>
-                <span style="background:#22c55e; color:black; font-size:0.7rem; padding:2px 8px; border-radius:9999px; font-weight:700;">OPTIMIZED</span>
+                ⚡ <span>Fast Player</span>
+                <span style="background:#22c55e; color:#000; padding:3px 10px; border-radius:9999px; font-size:0.75rem; font-weight:700;">OPTIMIZED</span>
             </div>
-            <select id="quality" style="background:rgba(255,255,255,0.1); border:none; color:white; padding:8px 12px; border-radius:8px;">
+            <select id="qualitySelector" style="background:rgba(255,255,255,0.15); border:none; color:white; padding:8px 14px; border-radius:8px;">
                 <option value="auto">Auto Quality</option>
             </select>
         </div>
 
         <!-- Bottom Controls -->
-        <div class="bottom-controls" id="bottomControls">
-            <div class="progress-container">
-                <div class="progress-bar" id="progressBar">
-                    <div class="progress-filled" id="progressFilled"></div>
-                </div>
+        <div class="bottom-controls">
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-filled" id="progressFilled"></div>
             </div>
 
             <div class="controls-row">
-                <button class="btn play-pause-btn" id="playPauseBtn">
-                    <svg id="playIcon" viewBox="0 0 24 24" fill="white" width="28" height="28"><polygon points="5 3 19 12 5 21"/></svg>
-                    <svg id="pauseIcon" viewBox="0 0 24 24" fill="white" width="28" height="28" style="display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-                </button>
-
+                <button class="btn play-pause-btn" id="playPauseBtn">▶</button>
+                
                 <div class="time" id="timeDisplay">0:00 / 0:00</div>
 
-                <!-- Spacer -->
                 <div style="flex: 1;"></div>
 
                 <button class="btn" id="speedBtn">1x</button>
                 <button class="btn" id="pipBtn">📺</button>
-                <button class="btn" id="fullscreenBtn" title="Fullscreen">⛶</button>
+                <!-- Prominent Fullscreen Button -->
+                <button class="btn" id="fullscreenBtn" title="Fullscreen" style="font-size:1.6rem;">⛶</button>
             </div>
         </div>
     </div>
@@ -232,35 +204,35 @@
         const video = document.getElementById('video');
         const urlParams = new URLSearchParams(window.location.search);
         const videoUrl = urlParams.get('url');
-
-        if (videoUrl) {
-            video.src = videoUrl;
-        }
+        if (videoUrl) video.src = videoUrl;
 
         const playPauseBtn = document.getElementById('playPauseBtn');
-        const playIcon = document.getElementById('playIcon');
-        const pauseIcon = document.getElementById('pauseIcon');
         const centerPlay = document.getElementById('centerPlay');
         const progressBar = document.getElementById('progressBar');
         const progressFilled = document.getElementById('progressFilled');
         const timeDisplay = document.getElementById('timeDisplay');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const container = document.getElementById('container');
+        const speedBtn = document.getElementById('speedBtn');
+        const loading = document.getElementById('loading');
+        const tapFeedback = document.getElementById('tapFeedback');
 
         let isPlaying = false;
+        let speeds = [0.5, 1, 1.25, 1.5, 2];
+        let currentSpeedIndex = 1;
+        let lastTapTime = 0;
+        let tapCount = 0;
 
-        function togglePlayPause() {
+        // Toggle Play/Pause
+        function togglePlay() {
             if (video.paused) {
                 video.play();
                 isPlaying = true;
-                playIcon.style.display = 'none';
-                pauseIcon.style.display = 'block';
+                playPauseBtn.innerHTML = '❚❚';
                 centerPlay.classList.remove('show');
             } else {
                 video.pause();
                 isPlaying = false;
-                playIcon.style.display = 'block';
-                pauseIcon.style.display = 'none';
+                playPauseBtn.innerHTML = '▶';
                 centerPlay.classList.add('show');
             }
         }
@@ -268,13 +240,20 @@
         // Fullscreen
         fullscreenBtn.addEventListener('click', () => {
             if (!document.fullscreenElement) {
-                container.requestFullscreen().catch(err => console.log(err));
+                document.getElementById('container').requestFullscreen();
             } else {
                 document.exitFullscreen();
             }
         });
 
-        // Progress
+        // Speed Control
+        speedBtn.addEventListener('click', () => {
+            currentSpeedIndex = (currentSpeedIndex + 1) % speeds.length;
+            video.playbackRate = speeds[currentSpeedIndex];
+            speedBtn.textContent = speeds[currentSpeedIndex] + 'x';
+        });
+
+        // Progress Bar
         video.addEventListener('timeupdate', () => {
             if (video.duration) {
                 const percent = (video.currentTime / video.duration) * 100;
@@ -289,49 +268,60 @@
             video.currentTime = pos * video.duration;
         });
 
-        // Center play button
-        centerPlay.addEventListener('click', togglePlayPause);
-        playPauseBtn.addEventListener('click', togglePlayPause);
-
         function formatTime(seconds) {
             if (!seconds || isNaN(seconds)) return "0:00";
-            const min = Math.floor(seconds / 60);
-            const sec = Math.floor(seconds % 60);
-            return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
         }
 
-        // Auto hide controls when playing
-        let hideTimeout;
-        function hideControls() {
-            if (isPlaying) {
-                document.getElementById('topBar').style.opacity = '0';
-                document.getElementById('bottomControls').style.opacity = '0';
+        // Single Tap - Play/Pause
+        video.addEventListener('click', togglePlay);
+        playPauseBtn.addEventListener('click', togglePlay);
+        centerPlay.addEventListener('click', togglePlay);
+
+        // Double Tap for Seek (Left = -10s, Right = +10s)
+        function handleTap(e) {
+            const now = Date.now();
+            const rect = video.getBoundingClientRect();
+            const tapX = e.clientX - rect.left;
+            const isRightSide = tapX > rect.width / 2;
+
+            if (now - lastTapTime < 300) {
+                tapCount++;
+                if (tapCount === 2) {
+                    const seekAmount = isRightSide ? 10 : -10;
+                    video.currentTime = Math.max(0, Math.min(video.duration, video.currentTime + seekAmount));
+                    
+                    // Show feedback
+                    tapFeedback.textContent = seekAmount > 0 ? `+${seekAmount}s` : `${seekAmount}s`;
+                    tapFeedback.style.left = isRightSide ? '70%' : '30%';
+                    tapFeedback.style.opacity = '1';
+                    setTimeout(() => tapFeedback.style.opacity = '0', 800);
+                    
+                    tapCount = 0;
+                }
+            } else {
+                tapCount = 1;
             }
+            lastTapTime = now;
         }
 
-        function showControls() {
-            document.getElementById('topBar').style.opacity = '1';
-            document.getElementById('bottomControls').style.opacity = '1';
-            clearTimeout(hideTimeout);
-            hideTimeout = setTimeout(hideControls, 3000);
-        }
+        video.addEventListener('click', handleTap);
 
-        container.addEventListener('mousemove', showControls);
-        container.addEventListener('touchstart', showControls);
+        // Loading Indicator
+        video.addEventListener('waiting', () => loading.style.display = 'block');
+        video.addEventListener('playing', () => loading.style.display = 'none');
 
-        // Keyboard support
+        // Keyboard Support
         document.addEventListener('keydown', e => {
-            if (e.code === 'Space') {
-                e.preventDefault();
-                togglePlayPause();
-            }
-            if (e.code === 'KeyF') {
-                e.preventDefault();
-                fullscreenBtn.click();
-            }
+            if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+            if (e.code === 'KeyF') { e.preventDefault(); fullscreenBtn.click(); }
         });
 
-        video.addEventListener('click', togglePlayPause);
+        // Show center play when paused
+        video.addEventListener('pause', () => centerPlay.classList.add('show'));
+        video.addEventListener('play', () => centerPlay.classList.remove('show'));
 
         // Load video
         video.load();
